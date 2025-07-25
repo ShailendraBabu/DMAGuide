@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Guide to C++ Dynamic Memory Allocation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Gemini Standard (Light Greys, Dark Text, Google Blue Accents) -->
+    <!-- Application Structure Plan: A single-page application with a fixed sidebar for navigation. The main content area updates dynamically based on user selection. This structure allows users to explore topics in any order, facilitating both linear learning and quick reference. Key interactions include visual simulations of heap allocation, interactive data structure builders (linked list), and a dynamic chart for shared_ptr reference counting. This task-oriented, exploratory design was chosen to make abstract memory concepts tangible and easier to grasp than a static document. -->
+    <!-- Visualization & Content Choices: 
+        - Stack vs. Heap: Goal: Compare. Viz: Side-by-side HTML/CSS diagram. Interaction: Hover tooltips. Justification: Clear, static comparison for foundational concepts.
+        - new/delete: Goal: Inform. Viz: Simulated heap area with animated blocks. Interaction: Buttons to allocate/deallocate. Justification: Visually connects code to memory actions.
+        - Linked List: Goal: Organize/Relationships. Viz: Interactive diagram with HTML nodes. Interaction: Add/remove nodes with corresponding code display. Justification: Demonstrates the dynamic nature of data structures.
+        - Smart Pointers: Goal: Compare/Inform. Viz: Chart.js for shared_ptr ref count. Interaction: Buttons to manipulate pointers and update the chart. Justification: A chart effectively visualizes the core mechanism of shared ownership.
+        - Dangers: Goal: Inform. Viz: Animated progress bar for memory leak. Interaction: Button to trigger the leak simulation. Justification: Simple animation effectively warns of the consequences.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F5F5F5; /* Very light grey */
+            color: #333333; /* Dark grey for main text */
+        }
+        .nav-link {
+            transition: all 0.2s ease-in-out;
+            border-left: 3px solid transparent;
+        }
+        .nav-link.active {
+            background-color: #E0E0E0; /* Light grey */
+            color: #1A73E8; /* Google Blue */
+            border-left-color: #1A73E8;
+        }
+        .nav-link:hover {
+            background-color: #E0E0E0;
+            border-left-color: #1A73E8;
+        }
+        .btn {
+            transition: all 0.2s ease-in-out;
+            background-color: #1A73E8; /* Google Blue */
+            color: white;
+            padding: 0.75rem 1.5rem; /* Uniform padding for buttons */
+            border-radius: 0.375rem; /* Consistent rounded corners */
+        }
+        .btn:hover {
+            background-color: #155BB5; /* Darker Blue */
+        }
+        .btn-secondary {
+            background-color: #E0E0E0; /* Light grey */
+            color: #333333; /* Dark text for secondary buttons */
+            padding: 0.75rem 1.5rem; /* Uniform padding for buttons */
+            border-radius: 0.375rem; /* Consistent rounded corners */
+        }
+        .btn-secondary:hover {
+            background-color: #D0D0D0; /* Even lighter grey */
+        }
+        .code-block {
+            background-color: #EEEEEE; /* Lighter grey for code */
+            color: #333333; /* Dark text for code */
+            font-family: 'Courier New', Courier, monospace;
+            padding: 1rem; /* Uniform padding */
+            border-radius: 0.375rem; /* Consistent rounded corners */
+        }
+        .heap-area {
+            background-color: #F0F0F0; /* Light grey for heap area */
+            border: 2px dashed #CCCCCC; /* Medium grey border */
+            min-height: 150px;
+            padding: 1.5rem; /* Increased padding for visual space */
+            border-radius: 0.5rem; /* Slightly more rounded corners */
+            display: flex; /* Ensure flex properties apply */
+            align-items: center; /* Center items vertically */
+            justify-content: center; /* Center items horizontally */
+            flex-wrap: wrap; /* Allow wrapping for array blocks */
+            gap: 1rem; /* Consistent gap between blocks */
+        }
+        .heap-block {
+            transition: all 0.5s ease;
+            opacity: 0;
+            transform: scale(0.8);
+            padding: 0.75rem 1rem; /* Uniform padding */
+            border-radius: 0.5rem; /* Consistent rounded corners */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Subtle shadow */
+        }
+        .heap-block.visible {
+            opacity: 1;
+            transform: scale(1);
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+            padding: 1rem; /* Padding inside chart container */
+            background-color: #FFFFFF; /* White background for chart */
+            border-radius: 0.5rem; /* Rounded corners for chart container */
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); /* Subtle shadow */
+        }
+        .ll-node {
+            border: 2px solid #1A73E8; /* Google Blue */
+            background-color: #FFFFFF; /* White background for nodes */
+            color: #333333; /* Dark text for list nodes */
+            min-width: 80px;
+            padding: 0.75rem 1rem; /* Uniform padding */
+            border-radius: 0.5rem; /* Consistent rounded corners */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08); /* Subtle shadow */
+        }
+        .ll-arrow {
+            position: relative;
+            width: 50px;
+            height: 2px;
+            background-color: #1A73E8; /* Google Blue */
+        }
+        .ll-arrow::after {
+            content: '';
+            position: absolute;
+            right: -1px;
+            top: -4px;
+            border: 5px solid transparent;
+            border-left-color: #1A73E8; /* Google Blue */
+        }
+        /* General section padding and margin */
+        .content-section {
+            padding-bottom: 3rem; /* Consistent bottom padding for sections */
+            margin-bottom: 2rem; /* Consistent margin between sections */
+        }
+        .content-section > h2 {
+            margin-bottom: 1.5rem; /* Space below main headings */
+            color: #212121; /* Darker text for main headings */
+        }
+        .content-section > p {
+            margin-bottom: 1rem; /* Space below paragraphs */
+            color: #4A4A4A; /* Medium dark grey for paragraphs */
+        }
+        .bg-white.p-6.rounded-lg.shadow { /* This class name is a remnant, but styles apply */
+            background-color: #FFFFFF; /* White background for content boxes */
+            padding: 2rem; /* Consistent padding for content boxes */
+            border-radius: 0.75rem; /* Slightly larger rounded corners for main content boxes */
+            box-shadow: 0 6px 10px rgba(0,0,0,0.08); /* More prominent shadow for content boxes */
+        }
+        .flex.items-center.justify-center.space-x-4,
+        .flex.items-center.space-x-4 {
+            margin-top: 1.5rem; /* Consistent top margin for button groups */
+            margin-bottom: 1.5rem; /* Consistent bottom margin for button groups */
+        }
+        .grid.md:grid-cols-2.gap-8 {
+            gap: 2rem; /* Increased gap for grid layouts */
+        }
+        /* Specific adjustments for Stack vs Heap list items */
+        .content-section#basics .bg-white ul li {
+            padding-top: 0.5rem; /* Added vertical padding to each list item */
+            padding-bottom: 0.5rem; /* Added vertical padding to each list item */
+            align-items: flex-start; /* Ensure items start at the top, useful for multi-line text */
+            color: #333333; /* Dark text for list items */
+        }
+        .content-section#basics .bg-white ul li strong {
+            color: #212121; /* Make strong text stand out more */
+        }
+        .content-section#basics .bg-white h3 {
+            color: #1A73E8; /* Google Blue for subheadings */
+        }
+        /* Overriding Tailwind's default gray shades for better contrast */
+        .text-gray-700 {
+            color: #333333; /* Darker for general text */
+        }
+        .text-gray-500 {
+            color: #666666; /* Medium grey for secondary text */
+        }
+        .text-gray-800 {
+            color: #212121; /* Even darker for main headings */
+        }
+        .text-gray-400 {
+            color: #999999; /* Still visible but muted */
+        }
+        .text-red-500 {
+            color: #F44336; /* Standard red */
+        }
+        .text-red-600 {
+            color: #D32F2F; /* Darker red */
+        }
+        .text-yellow-400 {
+            color: #FFC107; /* Standard amber */
+        }
+        .bg-yellow-50 {
+            background-color: #FFFDE7; /* Very light yellow background */
+            color: #FFC107; /* Brighter text on it */
+        }
+        .border-yellow-400 {
+            border-color: #FFC107;
+        }
+        .bg-blue-500 { /* For heap array blocks, changed to Google Blue */
+            background-color: #1A73E8; /* Google Blue for array blocks */
+        }
+        .bg-gray-200 { /* For leak progress bar track */
+            background-color: #E0E0E0;
+        }
+    </style>
+</head>
+<body class="flex h-screen">
+
+    <!-- Sidebar Navigation -->
+    <aside class="w-64 bg-white shadow-md flex-shrink-0 overflow-y-auto" style="background-color: #FFFFFF;">
+        <div class="p-6">
+            <h1 class="text-xl font-bold text-[#1A73E8]">C++ DMA Guide</h1>
+            <p class="text-sm text-gray-500 mt-1">An Interactive Journey</p>
+        </div>
+        <nav id="navigation" class="mt-4">
+            <a href="#intro" class="nav-link block p-4 text-sm font-medium text-gray-700 active">Introduction</a>
+            <a href="#basics" class="nav-link block p-4 text-sm font-medium text-gray-700">The Basics: Stack vs Heap</a>
+            <a href="#new-delete" class="nav-link block p-4 text-sm font-medium text-gray-700">Core Tools: `new` & `delete`</a>
+            <a href="#dma-in-action" class="nav-link block p-4 text-sm font-medium text-gray-700">DMA in Action</a>
+            <a href="#data-structures" class="nav-link block p-4 text-sm font-medium text-gray-700">Data Structures</a>
+            <a href="#smart-pointers" class="nav-link block p-4 text-sm font-medium text-gray-700">Modern C++: Smart Pointers</a>
+            <a href="#dangers" class="nav-link block p-4 text-sm font-medium text-gray-700">The Dangers</a>
+            <a href="#summary" class="nav-link block p-4 text-sm font-medium text-gray-700">Summary & Key Takeaways</a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-6 md:p-10 overflow-y-auto">
+        <!-- Introduction Section -->
+        <section id="intro" class="content-section">
+            <h2 class="text-3xl font-bold text-gray-800">Welcome to the Interactive Guide to Dynamic Memory Allocation</h2>
+            <p class="mt-4 text-lg text-gray-600">Dynamic Memory Allocation (DMA) is one of the most powerful, yet challenging, concepts in C++. It gives you direct control over memory, allowing you to build flexible and efficient applications. This guide is designed to demystify DMA through interactive examples and visualizations. You'll learn not just the "how," but also the "why" and the "when."</p>
+            <p class="mt-4 text-lg text-gray-600">Use the navigation on the left to journey from the fundamental concepts of the stack and heap, through the mechanics of `new` and `delete`, to the modern safety of smart pointers. Let's begin!</p>
+        </section>
+
+        <!-- The Basics: Stack vs Heap -->
+        <section id="basics" class="content-section hidden">
+            <h2 class="text-3xl font-bold text-gray-800">The Basics: Stack vs. Heap</h2>
+            <p class="mt-4 text-lg text-gray-600 mb-8">Every C++ program uses two primary memory regions to store data: the Stack and the Heap. Understanding their differences is the first step to mastering memory management. The stack is fast and automatically managed, while the heap is flexible and manually managed.</p>
+            <div class="grid md:grid-cols-2 gap-8 items-stretch">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="text-xl font-semibold text-center text-[#1A73E8] mb-4">STACK</h3>
+                    <ul class="space-y-3 text-gray-700">
+                        <li class="flex items-start"><span class="text-[#4CAF50] mr-2 font-bold">✓</span><strong>Fast Allocation:</strong> Memory is allocated and deallocated simply by moving a stack pointer.</li>
+                        <li class="flex items-start"><span class="text-[#4CAF50] mr-2 font-bold">✓</span><strong>Automatic Management:</strong> Memory is automatically freed when variables go out of scope. No manual cleanup needed.</li>
+                        <li class="flex items-start"><span class="text-red-500 mr-2 font-bold">✗</span><strong>Fixed Size:</strong> The stack has a limited size, and allocating too much can cause a "stack overflow."</li>
+                        <li class="flex items-start"><span class="text-red-500 mr-2 font-bold">✗</span><strong>Local Lifetime:</strong> Data only exists within the scope (e.g., the function) where it was created.</li>
+                    </ul>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="text-xl font-semibold text-center text-[#1A73E8] mb-4">HEAP (Free Store)</h3>
+                     <ul class="space-y-3 text-gray-700">
+                        <li class="flex items-start"><span class="text-red-500 mr-2 font-bold">✗</span><strong>Slower Allocation:</strong> Finding a suitable block of memory is a more complex operation.</li>
+                        <li class="flex items-start"><span class="text-red-500 mr-2 font-bold">✗</span><strong>Manual Management:</strong> You are responsible for allocating (`new`) and deallocating (`delete`) memory. Forgetting to `delete` causes memory leaks.</li>
+                        <li class="flex items-start"><span class="text-red-500 mr-2 font-bold">✗</span><strong>Fixed Size:</strong> The heap has a limited size, and allocating too much can cause a "stack overflow."</li>
+                        <li class="flex items-start"><span class="text-[#4CAF50] mr-2 font-bold">✓</span><strong>Large Size:</strong> The heap is much larger than the stack, suitable for large data objects.</li>
+                        <li class="flex items-start"><span class="text-[#4CAF50] mr-2 font-bold">✓</span><strong>Flexible Lifetime:</strong> Data persists until you explicitly deallocate it, regardless of scope.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Core Tools: new & delete -->
+        <section id="new-delete" class="content-section hidden">
+            <h2 class="text-3xl font-bold text-gray-800">Core Tools: `new` & `delete`</h2>
+            <p class="mt-4 text-lg text-gray-600">The `new` and `delete` operators are your tools for interacting with the heap. `new` requests a block of memory, and `delete` returns it. Let's see this in action. Click the buttons to allocate and deallocate memory for a simple integer and observe the visual representation of the heap.</p>
+            <div class="mt-8 bg-white p-6 rounded-lg shadow">
+                <div class="flex items-center justify-center space-x-4">
+                    <button id="new-int-btn" class="btn">`new int`</button>
+                    <button id="delete-int-btn" class="btn-secondary" disabled>`delete ptr`</button>
+                </div>
+                <div class="mt-6">
+                    <h4 class="font-semibold text-center mb-2">Visual Heap</h4>
+                    <div id="heap-demo-area" class="heap-area">
+                        <p class="text-gray-400">Heap is currently empty.</p>
+                    </div>
+                </div>
+                <div class="mt-6">
+                    <h4 class="font-semibold mb-2">Code:</h4>
+                    <div id="new-delete-code" class="code-block">
+                        // Click a button to see the corresponding code.
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- DMA in Action -->
+        <section id="dma-in-action" class="content-section hidden">
+            <h2 class="text-3xl font-bold text-gray-800">DMA in Action: Arrays and Objects</h2>
+            <p class="mt-4 text-lg text-gray-600">The true power of DMA shines when you don't know the size of your data at compile time. This is common for handling user input or data from files. Here, you can create an array of a size you specify. For arrays, we must use `delete[]` to ensure all elements are properly deallocated.</p>
+            <div class="mt-8 bg-white p-6 rounded-lg shadow">
+                <h3 class="text-xl font-semibold mb-4">Dynamic Array</h3>
+                <div class="flex items-center space-x-4">
+                    <label for="array-size" class="text-gray-700">Array Size:</label>
+                    <input type="number" id="array-size" value="5" min="1" max="10" class="w-20 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#1A73E8] focus:border-transparent" style="background-color: #FFFFFF; color: #333333; border-color: #CCCCCC;">
+                    <button id="new-array-btn" class="btn">`new int[size]`</button>
+                    <button id="delete-array-btn" class="btn-secondary" disabled>`delete[] arr`</button>
+                </div>
+                <div class="mt-6">
+                    <h4 class="font-semibold text-center mb-2">Visual Heap</h4>
+                    <div id="heap-array-demo-area" class="heap-area">
+                         <p class="text-gray-400">Heap is currently empty.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-8 bg-white p-6 rounded-lg shadow">
+                <h3 class="text-xl font-semibold mb-4">Dynamic Objects (Classes)</h3>
+                <p class="mt-2 text-gray-600">When you use `new` on a class object, its constructor is automatically called. When you use `delete`, its destructor is called. This is crucial for resource management (the RAII principle). Watch the log below as you create and destroy a `Book` object.</p>
+                <div class="mt-4 flex items-center space-x-4">
+                    <button id="new-obj-btn" class="btn">`new Book(...)`</button>
+                    <button id="delete-obj-btn" class="btn-secondary" disabled>`delete bookPtr`</button>
+                </div>
+                <div class="mt-4">
+                     <h4 class="font-semibold mb-2">Log:</h4>
+                     <div id="obj-log" class="code-block h-24 overflow-y-auto"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Data Structures -->
+        <section id="data-structures" class="content-section hidden">
+            <h2 class="text-3xl font-bold text-gray-800">Powering Data Structures</h2>
+            <p class="mt-4 text-lg text-gray-600">Dynamic data structures like linked lists, trees, and graphs are built on DMA. Each node is an independent piece of memory allocated on the heap, linked together by pointers. This allows them to grow and shrink as needed. Let's build a simple linked list.</p>
+            <div class="mt-8 bg-white p-6 rounded-lg shadow">
+                <h3 class="text-xl font-semibold mb-4">Interactive Linked List</h3>
+                <div class="mt-4 flex items-center space-x-4">
+                    <button id="ll-add-btn" class="btn">Add Node</button>
+                    <button id="ll-remove-btn" class="btn-secondary" disabled>Remove Node</button>
+                </div>
+                <div class="mt-6">
+                    <h4 class="font-semibold text-center mb-2">Visual List</h4>
+                    <div id="ll-area" class="heap-area justify-start min-h-[80px]">
+                         <p class="text-gray-400">List is empty.</p>
+                    </div>
+                </div>
+                 <div class="mt-6">
+                    <h4 class="font-semibold mb-2">Code for Last Action:</h4>
+                    <div id="ll-code" class="code-block">
+                        // Add or remove a node to see the code.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Smart Pointers -->
+        <section id="smart-pointers" class="content-section hidden">
+            <h2 class="text-3xl font-bold text-gray-800">Modern C++: Smart Pointers</h2>
+            <p class="mt-4 text-lg text-gray-600">Manual memory management is powerful but error-prone. Modern C++ provides "smart pointers" that automate memory management using the RAII principle. They act like pointers but automatically `delete` the memory when they are no longer needed, preventing memory leaks.</p>
+            <div class="mt-8 bg-white p-6 rounded-lg shadow">
+                <h3 class="text-xl font-semibold mb-4">`std::unique_ptr` - Exclusive Ownership</h3>
+                <p class="mt-2 text-gray-600">A `unique_ptr` has exclusive ownership of the memory. You cannot copy it, only move it. This guarantees there's only one owner, making memory management simple and safe. When the `unique_ptr` goes out of scope, the memory is freed.</p>
+            </div>
+            <div class="mt-8 bg-white p-6 rounded-lg shadow">
+                <h3 class="text-xl font-semibold mb-4">`std::shared_ptr` - Shared Ownership</h3>
+                <p class="mt-2 text-gray-600">A `shared_ptr` allows multiple pointers to co-own a piece of memory. It keeps a "reference count" of how many `shared_ptr`s are pointing to the object. The memory is only deleted when the last `shared_ptr` is destroyed (reference count drops to zero).</p>
+                <div class="mt-4">
+                    <div class="chart-container">
+                        <canvas id="sharedPtrChart"></canvas>
+                    </div>
+                    <div class="mt-4 flex items-center justify-center space-x-4">
+                        <button id="sp-create-btn" class="btn">Create</button>
+                        <button id="sp-copy-btn" class="btn-secondary" disabled>Add Co-owner</button>
+                        <button id="sp-destroy-btn" class="btn-secondary" disabled>Destroy a Co-owner</button>
+                    </div>
+                    <div id="sp-log" class="mt-4 text-center text-gray-600 font-medium"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- The Dangers -->
+        <section id="dangers" class="content-section hidden">
+            <h2 class="text-3xl font-bold text-gray-800">The Dangers: Leaks & Dangling Pointers</h2>
+            <p class="mt-4 text-lg text-gray-600">With great power comes great responsibility. Manual DMA can lead to serious bugs if not handled with care. The two most common issues are memory leaks and dangling pointers.</p>
+            <div class="mt-8 bg-white p-6 rounded-lg shadow">
+                <h3 class="text-xl font-semibold mb-4">Memory Leak Simulation</h3>
+                <p class="mt-2 text-gray-600">A memory leak happens when you allocate memory with `new` but forget to free it with `delete`. The program "loses" the pointer and can no longer access or free that memory. Over time, this consumes all available memory, crashing your application.</p>
+                <div class="mt-4">
+                    <button id="leak-btn" class="btn">Start Leaky Loop</button>
+                    <div class="w-full bg-gray-200 rounded-full h-6 mt-4">
+                        <div id="leak-progress" class="bg-red-600 h-6 rounded-full text-center text-white text-sm flex items-center justify-center" style="width: 0%">0%</div>
+                    </div>
+                    <p id="leak-status" class="text-center mt-2 text-red-600 font-semibold hidden">System memory critical!</p>
+                </div>
+            </div>
+             <div class="mt-8 bg-white p-6 rounded-lg shadow">
+                <h3 class="text-xl font-semibold mb-4">Dangling Pointer Hazard</h3>
+                <p class="mt-2 text-gray-600">A dangling pointer points to a memory location that has been deallocated or is no longer valid. Using (dereferencing) a dangling pointer leads to undefined behavior - your program might crash, corrupt data, or seem to work by chance. This is a very dangerous bug.</p>
+                <div class="mt-4 p-4 border-l-4 border-yellow-400 bg-yellow-50 rounded-md">
+                    <p class="font-bold mb-1">Best Practice:</p>
+                    <p>After calling `delete ptr;`, always set the pointer to null: `ptr = nullptr;`. This prevents it from dangling and makes it safe to check before use.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Summary -->
+        <section id="summary" class="content-section hidden">
+            <h2 class="text-3xl font-bold text-gray-800">Summary & Key Takeaways</h2>
+            <p class="mt-4 text-lg text-gray-600">You've completed the journey through C++ dynamic memory allocation. Let's recap the most important points.</p>
+            <div class="mt-8 grid md:grid-cols-2 gap-8">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="text-xl font-semibold text-[#1A73E8] mb-4">When to Use DMA</h3>
+                    <ul class="mt-4 space-y-3 list-disc list-inside text-gray-700">
+                        <li>When you don't know the size of data at compile time.</li>
+                        <li>When you need data to exist beyond the scope of a single function.</li>
+                        <li>For very large objects or arrays that won't fit on the stack.</li>
+                        <li>To implement dynamic data structures like lists, trees, and graphs.</li>
+                    </ul>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="text-xl font-semibold text-red-600 mb-4">The Golden Rules</h3>
+                    <ul class="mt-4 space-y-3 list-disc list-inside text-gray-700">
+                        <li>Every `new` must have a matching `delete`.</li>
+                        <li>Every `new T[size]` must have a matching `delete[]`.</li>
+                        <li>After `delete`, set the pointer to `nullptr` to avoid dangling pointers.</li>
+                        <li><strong>Prefer Smart Pointers:</strong> In modern C++, use `std::unique_ptr` and `std::shared_ptr` to prevent most memory management bugs automatically.</li>
+                    </ul>
+                </div>
+            </div>
+            <p class="mt-8 text-lg text-gray-600">By following these rules and preferring modern C++ features, you can harness the power of dynamic memory safely and effectively. Congratulations on mastering a crucial C++ skill!</p>
+        </section>
+
+    </main>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const navLinks = document.querySelectorAll('.nav-link');
+            const contentSections = document.querySelectorAll('.content-section');
+
+            function updateContent(sectionId) {
+                navLinks.forEach(link => {
+                    link.classList.toggle('active', link.getAttribute('href') === `#${sectionId}`);
+                });
+
+                contentSections.forEach(section => {
+                    section.classList.toggle('hidden', section.id !== sectionId);
+                });
+            }
+            
+            document.getElementById('navigation').addEventListener('click', (e) => {
+                if(e.target.tagName === 'A') {
+                    e.preventDefault(); // Prevent default hash change behavior
+                    const targetSectionId = e.target.getAttribute('href').substring(1);
+                    updateContent(targetSectionId);
+                }
+            });
+
+            // Initial content load
+            updateContent('intro');
+
+            // --- `new` and `delete` Demo ---
+            const newIntBtn = document.getElementById('new-int-btn');
+            const deleteIntBtn = document.getElementById('delete-int-btn');
+            const heapDemoArea = document.getElementById('heap-demo-area');
+            const newDeleteCode = document.getElementById('new-delete-code');
+            let intPtrExists = false;
+
+            newIntBtn.addEventListener('click', () => {
+                if (!intPtrExists) {
+                    heapDemoArea.innerHTML = `<div id="int-block" class="heap-block bg-[#1A73E8] text-white w-32 text-center">int block<br>(4 bytes)</div>`;
+                    setTimeout(() => document.getElementById('int-block').classList.add('visible'), 10);
+                    newDeleteCode.textContent = 'int* ptr = new int; // Memory allocated on the heap';
+                    intPtrExists = true;
+                    newIntBtn.disabled = true;
+                    deleteIntBtn.disabled = false;
+                }
+            });
+
+            deleteIntBtn.addEventListener('click', () => {
+                if (intPtrExists) {
+                    const block = document.getElementById('int-block');
+                    if (block) block.classList.remove('visible');
+                    setTimeout(() => {
+                         heapDemoArea.innerHTML = `<p class="text-gray-400">Heap is currently empty.</p>`;
+                    }, 500);
+                    newDeleteCode.textContent = 'delete ptr; // Memory deallocated\nptr = nullptr; // Prevent dangling pointer';
+                    intPtrExists = false;
+                    newIntBtn.disabled = false;
+                    deleteIntBtn.disabled = true;
+                }
+            });
+
+            // --- Dynamic Array Demo ---
+            const newArrayBtn = document.getElementById('new-array-btn');
+            const deleteArrayBtn = document.getElementById('delete-array-btn');
+            const arraySizeInput = document.getElementById('array-size');
+            const heapArrayArea = document.getElementById('heap-array-demo-area');
+            let arrayPtrExists = false;
+
+            newArrayBtn.addEventListener('click', () => {
+                if (!arrayPtrExists) {
+                    const size = parseInt(arraySizeInput.value, 10);
+                    heapArrayArea.innerHTML = '';
+                    for (let i = 0; i < size; i++) {
+                        const block = document.createElement('div');
+                        block.className = 'heap-block bg-[#1A73E8] text-white';
+                        block.textContent = `[${i}]`;
+                        block.style.transitionDelay = `${i * 50}ms`;
+                        heapArrayArea.appendChild(block);
+                        setTimeout(() => block.classList.add('visible'), 10);
+                    }
+                    arrayPtrExists = true;
+                    newArrayBtn.disabled = true;
+                    deleteArrayBtn.disabled = false;
+                    arraySizeInput.disabled = true;
+                }
+            });
+            
+            deleteArrayBtn.addEventListener('click', () => {
+                if (arrayPtrExists) {
+                    const blocks = heapArrayArea.querySelectorAll('.heap-block');
+                    blocks.forEach(b => b.classList.remove('visible'));
+                     setTimeout(() => {
+                         heapArrayArea.innerHTML = `<p class="text-gray-400">Heap is currently empty.</p>`;
+                    }, 500);
+                    arrayPtrExists = false;
+                    newArrayBtn.disabled = false;
+                    deleteArrayBtn.disabled = true;
+                    arraySizeInput.disabled = false;
+                }
+            });
+
+            // --- Dynamic Object Demo ---
+            const newObjBtn = document.getElementById('new-obj-btn');
+            const deleteObjBtn = document.getElementById('delete-obj-btn');
+            const objLog = document.getElementById('obj-log');
+            let objPtrExists = false;
+            
+            function logToObj(message) {
+                const p = document.createElement('p');
+                p.textContent = `> ${message}`;
+                objLog.appendChild(p);
+                objLog.scrollTop = objLog.scrollHeight;
+            }
+
+            newObjBtn.addEventListener('click', () => {
+                if (!objPtrExists) {
+                    logToObj("Executing: Book* b = new Book(...);");
+                    logToObj("Book constructor called.");
+                    objPtrExists = true;
+                    newObjBtn.disabled = true;
+                    deleteObjBtn.disabled = false;
+                }
+            });
+
+            deleteObjBtn.addEventListener('click', () => {
+                if (objPtrExists) {
+                    logToObj("Executing: delete b;");
+                    logToObj("Book destructor called.");
+                    objPtrExists = false;
+                    newObjBtn.disabled = false;
+                    deleteObjBtn.disabled = true;
+                }
+            });
+
+            // --- Linked List Demo ---
+            const llAddBtn = document.getElementById('ll-add-btn');
+            const llRemoveBtn = document.getElementById('ll-remove-btn');
+            const llArea = document.getElementById('ll-area');
+            const llCode = document.getElementById('ll-code');
+            let llNodeCount = 0;
+            
+            llAddBtn.addEventListener('click', () => {
+                if(llNodeCount === 0) llArea.innerHTML = '';
+                llNodeCount++;
+
+                const node = document.createElement('div');
+                node.className = 'll-node p-2 rounded text-center';
+                node.textContent = `Node ${llNodeCount}`;
+                node.id = `ll-node-${llNodeCount}`;
+
+                if (llNodeCount > 1) {
+                    const arrow = document.createElement('div');
+                    arrow.className = 'll-arrow';
+                    llArea.appendChild(arrow);
+                }
+                
+                llArea.appendChild(node);
+                llRemoveBtn.disabled = false;
+                llCode.textContent = `Node* newNode = new Node(${llNodeCount}); // New node on heap`;
+            });
+
+            llRemoveBtn.addEventListener('click', () => {
+                if (llNodeCount > 0) {
+                    const nodeToRemove = document.getElementById(`ll-node-${llNodeCount}`);
+                    if (nodeToRemove) llArea.removeChild(nodeToRemove);
+                    
+                    if (llNodeCount > 1) {
+                        const lastArrow = llArea.querySelector('.ll-arrow:last-of-type');
+                        if(lastArrow) llArea.removeChild(lastArrow);
+                    }
+
+                    llCode.textContent = `delete nodeToRemove; // Freed node ${llNodeCount}`;
+                    llNodeCount--;
+                    
+                    if (llNodeCount === 0) {
+                        llRemoveBtn.disabled = true;
+                        llArea.innerHTML = `<p class="text-gray-400">List is empty.</p>`;
+                    }
+                }
+            });
+            
+            // --- Smart Pointer Demo ---
+            const spCreateBtn = document.getElementById('sp-create-btn');
+            const spCopyBtn = document.getElementById('sp-copy-btn');
+            const spDestroyBtn = document.getElementById('sp-destroy-btn');
+            const spLog = document.getElementById('sp-log');
+            let sharedPtrChart;
+            let refCount = 0;
+
+            function updateChart() {
+                if (!sharedPtrChart) {
+                    const ctx = document.getElementById('sharedPtrChart').getContext('2d');
+                    sharedPtrChart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: ['Reference Count'],
+                            datasets: [{
+                                label: 'shared_ptr Count',
+                                data: [0],
+                                backgroundColor: ['#1A73E8'], /* Google Blue for chart bars */
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    max: 5,
+                                    ticks: { stepSize: 1 },
+                                    grid: {
+                                        color: '#CCCCCC' /* Lighter grid lines for light theme */
+                                    },
+                                    font: {
+                                        color: '#333333' /* Darker font for Y-axis labels */
+                                    }
+                                },
+                                x: {
+                                    grid: {
+                                        color: '#CCCCCC' /* Lighter grid lines for light theme */
+                                    },
+                                    font: {
+                                        color: '#333333' /* Darker font for X-axis labels */
+                                    }
+                                }
+                            },
+                            plugins: {
+                                legend: { display: false },
+                                title: {
+                                    display: true,
+                                    text: 'Shared Pointer Ownership',
+                                    color: '#212121' /* Darker title color */
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        title: function(context) {
+                                            return 'Reference Count';
+                                        },
+                                        label: function(context) {
+                                            let label = context.dataset.label || '';
+                                            if (label) {
+                                                label += ': ';
+                                            }
+                                            if (context.parsed.y !== null) {
+                                                label += context.parsed.y;
+                                            }
+                                            return label;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+                sharedPtrChart.data.datasets[0].data[0] = refCount;
+                sharedPtrChart.update();
+
+                spCopyBtn.disabled = refCount === 0 || refCount >= 5;
+                spDestroyBtn.disabled = refCount === 0;
+                spCreateBtn.disabled = refCount > 0;
+            }
+
+            spCreateBtn.addEventListener('click', () => {
+                refCount = 1;
+                spLog.textContent = 'Resource created. One shared_ptr owns it.';
+                updateChart();
+            });
+
+            spCopyBtn.addEventListener('click', () => {
+                if (refCount > 0 && refCount < 5) {
+                    refCount++;
+                    spLog.textContent = `Ownership shared. ${refCount} pointers now own the resource.`;
+                    updateChart();
+                }
+            });
+
+            spDestroyBtn.addEventListener('click', () => {
+                if (refCount > 0) {
+                    refCount--;
+                    if (refCount === 0) {
+                        spLog.textContent = 'Last owner destroyed. Resource is now deallocated.';
+                    } else {
+                        spLog.textContent = `An owner was destroyed. ${refCount} owners remain.`;
+                    }
+                    updateChart();
+                }
+            });
+
+            updateChart();
+
+            // --- Leak Demo ---
+            const leakBtn = document.getElementById('leak-btn');
+            const leakProgress = document.getElementById('leak-progress');
+            const leakStatus = document.getElementById('leak-status');
+            let leakInterval;
+
+            leakBtn.addEventListener('click', () => {
+                leakBtn.disabled = true;
+                leakStatus.classList.add('hidden');
+                let width = 0;
+                leakInterval = setInterval(() => {
+                    if (width >= 100) {
+                        clearInterval(leakInterval);
+                        leakStatus.classList.remove('hidden');
+                        leakBtn.disabled = false;
+                    } else {
+                        width++;
+                        leakProgress.style.width = width + '%';
+                        leakProgress.textContent = width + '%';
+                    }
+                }, 50);
+            });
+        });
+    </script>
+</body>
+</html>
